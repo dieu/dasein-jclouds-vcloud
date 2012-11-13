@@ -100,7 +100,7 @@ public class VcloudVDC implements DataCenterServices {
     
     @Override
     public @Nonnull Collection<DataCenter> listDataCenters(@Nonnull String providerRegionId) throws InternalException, CloudException {
-        if( !providerRegionId.equals(getContext().getRegionId()) ) {
+        if( providerRegionId != null && !providerRegionId.equals(getContext().getRegionId()) ) {
             return Collections.emptyList();
         }
         RestContext<VCloudClient, VCloudAsyncClient> ctx = provider.getCloudClient();
