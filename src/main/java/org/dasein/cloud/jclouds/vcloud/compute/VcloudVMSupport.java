@@ -20,14 +20,7 @@ package org.dasein.cloud.jclouds.vcloud.compute;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
@@ -239,9 +232,7 @@ public class VcloudVMSupport implements VirtualMachineSupport {
 
     @Override
     public VirtualMachine launch(String fromMachineImageId, VirtualMachineProduct product, String dataCenterId, String name, String description, String withKeypairId, String inVlanId, boolean withAnalytics, boolean asSandbox, String[] firewallIds, Tag... tags) throws InternalException, CloudException {
-        VApp app = launch(fromMachineImageId, product, dataCenterId, name, inVlanId, IpAddressAllocationMode.POOL.toString());
-
-        Collection<VirtualMachine> vms = toVirtualMachines(provider.getCloudClient(), app);
+        Collection<VirtualMachine> vms = launch(fromMachineImageId, product, dataCenterId, name, inVlanId, new ArrayList<AllocationMode>());
 
         if( vms.isEmpty() ) {
             return null;
@@ -250,14 +241,10 @@ public class VcloudVMSupport implements VirtualMachineSupport {
         return vms.iterator().next();
     }
 
-    public VApp launch(String fromMachineImageId, VirtualMachineProduct product, String dataCenterId, String name, String inVlanId, String allocationMode) throws InternalException, CloudException {
+    public Collection<VirtualMachine> launch(String fromMachineImageId, VirtualMachineProduct product, String dataCenterId, String name, String inVlanId, List<AllocationMode> modes) throws InternalException, CloudException {
         RestContext<VCloudClient, VCloudAsyncClient> ctx = provider.getCloudClient();
-
-        provider.getComputeServices().getImageSupport().listMachineImages();
         try {
             try {
-                product = getProduct(product.getProductId());
-
                 InstantiateVAppTemplateOptions options = InstantiateVAppTemplateOptions.Builder.description(fromMachineImageId);
                 VAppTemplate template = ctx.getApi().getVAppTemplateClient().getVAppTemplate(provider.toHref(ctx, fromMachineImageId));
 
@@ -289,7 +276,7 @@ public class VcloudVMSupport implements VirtualMachineSupport {
                     } catch (Throwable ignore) {}
                 }
                 app = provider.waitForIdle(ctx, app);
-                Set<? extends Vm> children = app.getChildren();
+                List<Vm> children = new ArrayList<Vm>(app.getChildren());
                 int i = 0;
 
                 name = provider.validateName(name);
@@ -316,8 +303,8 @@ public class VcloudVMSupport implements VirtualMachineSupport {
                     network = provider.getNetworkServices().getVlanSupport().getVlan(inVlanId);
                 }
 
-                for( Vm vm : children ) {
-                    vm = provider.waitForIdle(ctx, vm);
+                for (i = 0; i < children.size(); i++) {
+                    Vm vm = provider.waitForIdle(ctx, children.get(i));
 
                     ArrayList<NetworkConnection> connections = new ArrayList<NetworkConnection>();
                     NetworkConnectionSection section = vm.getNetworkConnectionSection();
@@ -333,9 +320,12 @@ public class VcloudVMSupport implements VirtualMachineSupport {
 
                     NetworkConnection.Builder b = NetworkConnection.builder().connected(true);
 
-                    b.ipAddressAllocationMode(IpAddressAllocationMode.valueOf(allocationMode));
+                    b.ipAddressAllocationMode(modes.get(i).getAllocateMode());
                     b.network(network.getName());
                     b.networkConnectionIndex(0);
+                    if (modes.get(i).getAllocateMode() == IpAddressAllocationMode.MANUAL) {
+                        b.ipAddress(modes.get(i).getIpAddress());
+                    }
                     connections.add(b.build());
 
                     sectionBuilder.connections(connections);
@@ -350,7 +340,7 @@ public class VcloudVMSupport implements VirtualMachineSupport {
                 app = provider.waitForIdle(ctx, app);
                 ctx.getApi().getVAppClient().deployAndPowerOnVApp(app.getHref());
 
-                return app;
+                return toVirtualMachines(provider.getCloudClient(), app);
             }
             catch( RuntimeException e ) {
                 logger.error("Error launching from " + fromMachineImageId + ": " + e.getMessage());
@@ -700,20 +690,16 @@ public class VcloudVMSupport implements VirtualMachineSupport {
 
         System.out.println("Checking network connections: " + vcloudVm.getNetworkConnectionSection().getConnections());
 
-        for( NetworkConnection c : vcloudVm.getNetworkConnectionSection().getConnections() ) {
+        Set<NetworkConnection> connections = vcloudVm.getNetworkConnectionSection().getConnections();
+        for( NetworkConnection c : connections) {
             System.out.println("EXT=" + c.getExternalIpAddress());
             System.out.println("Assigned=" + c.getIpAddress());
             System.out.println("Model=" + c.getIpAddressAllocationMode());
             System.out.println("Network=" + c.getNetwork());
 
             if( c.getNetworkConnectionIndex() == vcloudVm.getNetworkConnectionSection().getPrimaryNetworkConnectionIndex() ) {
-                Iterable<VLAN> vlans = provider.getNetworkServices().getVlanSupport().listVlans();
+                providerNetworkId = provider.getNetworkServices().getVlanSupport().getVlanByName(c.getNetwork()).getProviderVlanId();
 
-                for( VLAN vlan : vlans ) {
-                    if( vlan.getName().equalsIgnoreCase(c.getNetwork()) ) {
-                        providerNetworkId = vlan.getProviderVlanId();
-                    }
-                }
                 if( c.getExternalIpAddress() != null ) {
                     externalIp = c.getExternalIpAddress();
                 }
@@ -789,6 +775,28 @@ public class VcloudVMSupport implements VirtualMachineSupport {
         vm.setCreationTimestamp(created);
         vm.setTerminationTimestamp(0L);
         return vm;
+    }
+
+    public static class AllocationMode {
+        private final String allocateMode;
+        private final String ipAddress;
+
+        public AllocationMode() {
+            this(IpAddressAllocationMode.POOL.toString(), null);
+        }
+
+        public AllocationMode(String allocateMode, String ipAddress) {
+            this.allocateMode = allocateMode;
+            this.ipAddress = ipAddress;
+        }
+
+        public IpAddressAllocationMode getAllocateMode() {
+            return IpAddressAllocationMode.valueOf(allocateMode);
+        }
+
+        public String getIpAddress() {
+            return ipAddress;
+        }
     }
 
 }

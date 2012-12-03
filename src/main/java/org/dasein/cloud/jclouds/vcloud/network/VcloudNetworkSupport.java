@@ -67,13 +67,15 @@ public class VcloudNetworkSupport implements VLANSupport {
 
 	@Override
 	public VLAN getVlan(String vlanId) throws CloudException, InternalException {
-		for( VLAN vlan : listVlans() ) {
-			if( vlan.getProviderVlanId().equals(vlanId) ) {
-				return vlan;
-			}
-		}
-		return null;
+        RestContext<VCloudClient, VCloudAsyncClient> ctx = provider.getCloudClient();
+        return toVlan(ctx, ctx.getApi().getNetworkClient().getNetwork(provider.toHref(ctx, vlanId)));
 	}
+
+    public VLAN getVlanByName(String name) throws CloudException, InternalException {
+        RestContext<VCloudClient, VCloudAsyncClient> ctx = provider.getCloudClient();
+        ReferenceType vlan = provider.getOrg().getNetworks().get(name);
+        return toVlan(ctx, ctx.getApi().getNetworkClient().getNetwork(vlan.getHref()));
+    }
 
 	@Override
 	public boolean isSubscribed() throws CloudException, InternalException {
