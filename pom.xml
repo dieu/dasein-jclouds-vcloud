@@ -270,14 +270,22 @@
         </executions>
       </plugin>       
     </plugins>
+    <extensions>
+      <extension>
+        <groupId>org.springframework.build</groupId>
+        <artifactId>aws-maven</artifactId>
+        <version>5.0.0.RELEASE</version>
+      </extension>
+    </extensions>
   </build>
 
-    <distributionManagement>
-        <repository>
-            <id>maven-repository</id>
-            <url>file:///Users/Anton/Project/mvn-repo/snapshots</url>
-        </repository>
-    </distributionManagement>
+  <distributionManagement>
+    <snapshotRepository>
+      <id>aws-snapshot</id>
+      <name>AWS Snapshot Repository</name>
+      <url>s3://cometera-mvn-repo/snapshots</url>
+    </snapshotRepository>
+  </distributionManagement>
   
   <developers>
     <developer>
