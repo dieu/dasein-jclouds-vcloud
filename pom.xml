@@ -22,7 +22,7 @@
 
   <groupId>org.dasein</groupId>
   <artifactId>dasein-jclouds-vcloud</artifactId>
-  <version>2012.04.3.1</version>
+  <version>2012.04.3.1-QUBELL-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>dasein-jclouds-vcloud</name>
@@ -61,8 +61,8 @@
       
   <repositories>
     <repository>
-        <id>jclouds</id>
-        <url>http://jclouds.googlecode.com/svn/repo</url>
+        <id>Qubell snapshots</id>
+        <url>http://s3.amazonaws.com/cometera-mvn-repo/snapshots</url>
     </repository>    
   </repositories>
         
@@ -102,19 +102,19 @@
         <optional>false</optional>
     </dependency> 
     <dependency>
-        <groupId>org.jclouds.api</groupId>
+        <groupId>org.apache.jclouds.api</groupId>
         <artifactId>vcloud</artifactId>
-        <version>1.5.0-beta.7</version>
+        <version>1.5.11-SNAPSHOT</version>
     </dependency> 
     <dependency>
-        <groupId>org.jclouds.provider</groupId>
+        <groupId>org.apache.jclouds.provider</groupId>
         <artifactId>bluelock-vcloud-zone01</artifactId>
-        <version>1.5.0-beta.7</version>
+        <version>1.5.11-SNAPSHOT</version>
     </dependency>
     <dependency>
-        <groupId>org.jclouds.driver</groupId>
+        <groupId>org.apache.jclouds.driver</groupId>
         <artifactId>jclouds-log4j</artifactId>
-        <version>1.5.0-beta.7</version>
+        <version>1.5.11-SNAPSHOT</version>
     </dependency>          
   </dependencies>
   
@@ -270,14 +270,22 @@
         </executions>
       </plugin>       
     </plugins>
+    <extensions>
+      <extension>
+        <groupId>org.springframework.build</groupId>
+        <artifactId>aws-maven</artifactId>
+        <version>5.0.0.RELEASE</version>
+      </extension>
+    </extensions>
   </build>
 
-    <distributionManagement>
-        <repository>
-            <id>maven-repository</id>
-            <url>file:///Users/Anton/Project/mvn-repo/snapshots</url>
-        </repository>
-    </distributionManagement>
+  <distributionManagement>
+    <snapshotRepository>
+      <id>aws-snapshot</id>
+      <name>AWS Snapshot Repository</name>
+      <url>s3://cometera-mvn-repo/snapshots</url>
+    </snapshotRepository>
+  </distributionManagement>
   
   <developers>
     <developer>
