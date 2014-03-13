@@ -33,10 +33,9 @@ import org.dasein.cloud.network.NetworkInterface;
 import org.dasein.cloud.network.Subnet;
 import org.dasein.cloud.network.VLANSupport;
 import org.dasein.cloud.network.VLAN;
+import org.jclouds.rest.ApiContext;
 import org.jclouds.rest.AuthorizationException;
-import org.jclouds.rest.RestContext;
-import org.jclouds.vcloud.VCloudAsyncClient;
-import org.jclouds.vcloud.VCloudClient;
+import org.jclouds.vcloud.VCloudApi;
 import org.jclouds.vcloud.VCloudMediaType;
 import org.jclouds.vcloud.domain.NetworkConnection;
 import org.jclouds.vcloud.domain.Org;
@@ -44,7 +43,7 @@ import org.jclouds.vcloud.domain.ReferenceType;
 import org.jclouds.vcloud.domain.Vm;
 import org.jclouds.vcloud.domain.network.IpScope;
 import org.jclouds.vcloud.domain.network.OrgNetwork;
-import org.jclouds.vcloud.features.NetworkClient;
+import org.jclouds.vcloud.features.NetworkApi;
 
 import javax.annotation.Nonnull;
 
@@ -67,14 +66,14 @@ public class VcloudNetworkSupport implements VLANSupport {
 
 	@Override
 	public VLAN getVlan(String vlanId) throws CloudException, InternalException {
-        RestContext<VCloudClient, VCloudAsyncClient> ctx = provider.getCloudClient();
-        return toVlan(ctx, ctx.getApi().getNetworkClient().getNetwork(provider.toHref(ctx, vlanId)));
+        ApiContext<VCloudApi> ctx = provider.getCloudClient();
+        return toVlan(ctx, ctx.getApi().getNetworkApi().getNetwork(provider.toHref(ctx, vlanId)));
 	}
 
     public VLAN getVlanByName(String name) throws CloudException, InternalException {
-        RestContext<VCloudClient, VCloudAsyncClient> ctx = provider.getCloudClient();
+        ApiContext<VCloudApi> ctx = provider.getCloudClient();
         ReferenceType vlan = provider.getOrg().getNetworks().get(name);
-        return toVlan(ctx, ctx.getApi().getNetworkClient().getNetwork(vlan.getHref()));
+        return toVlan(ctx, ctx.getApi().getNetworkApi().getNetwork(vlan.getHref()));
     }
 
 	@Override
@@ -93,20 +92,20 @@ public class VcloudNetworkSupport implements VLANSupport {
 
 	@Override
 	public Iterable<NetworkInterface> listNetworkInterfaces(String forVmId) throws CloudException, InternalException {
-		RestContext<VCloudClient, VCloudAsyncClient> ctx = provider.getCloudClient();
+		ApiContext<VCloudApi> ctx = provider.getCloudClient();
 
 		try {
 			try {
 				Map<String,ReferenceType> map = provider.getOrg().getNetworks();
 				ArrayList<NetworkInterface> list = new ArrayList<NetworkInterface>();
 				ArrayList<OrgNetwork> networks = new ArrayList<OrgNetwork>();
-				Vm vm = ctx.getApi().getVmClient().getVm(provider.toHref(ctx, forVmId));
+				Vm vm = ctx.getApi().getVmApi().getVm(provider.toHref(ctx, forVmId));
 				NetworkConnection def = null;
 
 				if( map != null ) {
 					for( ReferenceType t : map.values() ) {
 						if( t.getType().equals(VCloudMediaType.NETWORK_XML) ) {
-							OrgNetwork network = ctx.getApi().getNetworkClient().getNetwork(t.getHref());
+							OrgNetwork network = ctx.getApi().getNetworkApi().getNetwork(t.getHref());
 
 							if( network != null ) {
 								networks.add(network);
@@ -158,7 +157,7 @@ public class VcloudNetworkSupport implements VLANSupport {
 	@Override
 	public Iterable<VLAN> listVlans() throws CloudException, InternalException {
 		logger.trace("enter - listVlans()");
-		RestContext<VCloudClient, VCloudAsyncClient> ctx = provider.getCloudClient();
+		ApiContext<VCloudApi> ctx = provider.getCloudClient();
 
 		try {
 			ArrayList<VLAN> list = new ArrayList<VLAN>();
@@ -178,13 +177,13 @@ public class VcloudNetworkSupport implements VLANSupport {
 			logger.debug("map size = " + map.size());
 			for( ReferenceType type : map.values() ) {
 				if( type.getType().equals(VCloudMediaType.NETWORK_XML) ) {
-					VCloudClient client = ctx.getApi();
-					NetworkClient networkClient = null;
+					VCloudApi client = ctx.getApi();
+					NetworkApi networkClient = null;
 					if (client != null){
-						networkClient = client.getNetworkClient();
+						networkClient = client.getNetworkApi();
 					}
 					else {
-						logger.warn("listVlans(): VCloudClient is null");
+						logger.warn("listVlans(): VCloudApi is null");
 					}
 					if (networkClient != null){
 						logger.debug("listVlans(): type name = " + type.getName());
@@ -282,7 +281,7 @@ public class VcloudNetworkSupport implements VLANSupport {
 		return network.toString();
 	}
 
-	private VLAN toVlan(RestContext<VCloudClient, VCloudAsyncClient> ctx, OrgNetwork network) throws CloudException {
+	private VLAN toVlan(ApiContext<VCloudApi> ctx, OrgNetwork network) throws CloudException {
 		if( network == null ) {
 			return null;
 		}
